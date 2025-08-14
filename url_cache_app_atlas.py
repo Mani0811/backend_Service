@@ -9,12 +9,30 @@ from typing import Optional
 import json
 import urllib.parse
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 
 from privacy_compliance_scorer import PrivacyComplianceScorer
 
 
 # Initialize FastAPI app
 app = FastAPI(title="URL Cache API", description="Cache API responses in MongoDB Atlas")
+
+origins = [
+    "http://localhost",
+    "http://localhost:8000",
+    # Add the origin of your frontend if it's served from a specific port
+    # For local file:// access, the origin is "null"
+    "null", 
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # Allows specific origins
+    # Or use allow_origins=["*"] to allow all origins (less secure)
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"], # Allow POST and the preflight OPTIONS request
+    allow_headers=["*"], # Allow all headers
+)
+# --- End of CORS middleware section ---
 
 class AnalyzeRequest(BaseModel):
     url: str
@@ -208,7 +226,7 @@ async def fetch_url_data(body: AnalyzeRequest):
         document = {
             "_id": url,
             "url": url,
-            "api_response": api_response,
+            "api_response": api_response.get("data"),
             "cached_at": datetime.utcnow().isoformat()
         }
         
@@ -229,7 +247,7 @@ async def fetch_url_data(body: AnalyzeRequest):
             "source": "fresh_api_call",
             "url": url,
             "cached_at": document["cached_at"],
-            "api_response": api_response
+            "api_response": api_response.get("data")
         }
         
     except Exception as e:
